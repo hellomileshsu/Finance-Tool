@@ -28,8 +28,18 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT secret is empty or missing"
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          if ! jq -e '.type == "service_account"' "$RUNNER_TEMP/sa.json" > /dev/null 2>&1; then
+            echo "::error::Secret is not a valid service account JSON (missing or wrong .type)"
+            exit 1
+          fi
+          echo "Service account project: $(jq -r '.project_id' "$RUNNER_TEMP/sa.json")"
+          echo "Service account email:   $(jq -r '.client_email' "$RUNNER_TEMP/sa.json")"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
 
       - name: Deploy Firestore rules
-        run: firebase deploy --only firestore:rules --project finance-a7184 --non-interactive
+        run: firebase deploy --only firestore:rules --project finance-a7184 --non-interactive --debug
