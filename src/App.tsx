@@ -31,7 +31,7 @@ import firebaseConfig from '../firebase-applet-config.json';
 // --- Firebase Initialization ---
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app);
 
 // --- Utility Functions ---
 const formatCurrency = (num: number | null | undefined) => {
