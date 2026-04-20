@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "A financial category for income or expenses.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "order": { "type": "number", "minimum": 0 },
+        "defaultAmount": { "type": "number", "description": "Optional recurring amount" }
+      },
+      "required": ["id", "name", "type", "order"]
+    },
+    "Record": {
+      "title": "Record",
+      "description": "Monthly financial record containing values for different categories.",
+      "type": "object",
+      "properties": {
+        "month": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$" },
+        "values": { 
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        }
+      },
+      "required": ["month", "values"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "User specific general settings.",
+      "type": "object",
+      "properties": {
+        "baseInitialBalance": { "type": "number" }
+      },
+      "required": ["baseInitialBalance"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Stores user-defined categories for income and expense."
+    },
+    "/users/{userId}/records/{month}": {
+      "schema": "Record",
+      "description": "Stores monthly financial records of category values."
+    },
+    "/users/{userId}/settings/general": {
+      "schema": "Settings",
+      "description": "A single document storing user settings like base balance."
+    }
+  }
+}

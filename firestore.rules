@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Global Default Deny
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+    
+    // --- Primitives ---
+    function isValidId(id) { 
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+
+    // --- Validation Blueprints ---
+    function isValidCategory(data) {
+      return data.keys().hasAll(['id', 'name', 'type', 'order']) &&
+             data.keys().size() <= 5 &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.type is string && (data.type == 'income' || data.type == 'expense') &&
+             data.order is number &&
+             data.get('defaultAmount', 0) is number;
+    }
+
+    function isValidRecord(data) {
+      return data.keys().hasAll(['month', 'values']) &&
+             data.keys().size() == 2 &&
+             data.month is string && data.month.matches('^[0-9]{4}-[0-9]{2}$') &&
+             data.values is map;
+    }
+
+    function isValidSettings(data) {
+      return data.keys().hasAll(['baseInitialBalance']) &&
+             data.keys().size() == 1 &&
+             data.baseInitialBalance is number;
+    }
+    
+    // --- Paths & Rules ---
+    match /users/{userId} {
+      
+      match /categories/{categoryId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(categoryId) && isValidCategory(incoming());
+        allow update: if isOwner(userId) && isValidId(categoryId) && isValidCategory(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'type', 'order', 'defaultAmount']) &&
+          incoming().id == existing().id // Immutable ID
+        );
+        allow delete: if isOwner(userId) && isValidId(categoryId);
+      }
+      
+      match /records/{monthId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && monthId.matches('^[0-9]{4}-[0-9]{2}$') && isValidRecord(incoming());
+        allow update: if isOwner(userId) && monthId.matches('^[0-9]{4}-[0-9]{2}$') && isValidRecord(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['month', 'values']) &&
+          incoming().month == existing().month // Immutable month
+        );
+        allow delete: if isOwner(userId) && monthId.matches('^[0-9]{4}-[0-9]{2}$');
+      }
+      
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && settingId == 'general' && isValidSettings(incoming());
+        allow update: if isOwner(userId) && settingId == 'general' && isValidSettings(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['baseInitialBalance'])
+        );
+        allow delete: if isOwner(userId) && settingId == 'general';
+      }
+    }
+  }
+}
