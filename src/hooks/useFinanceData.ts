@@ -37,6 +37,7 @@ export function useFinanceData() {
   const [settings, setSettings] = useState<Settings>({baseInitialBalance: 0});
 
   const seededCategoriesRef = useRef(false);
+  const seededRecordsRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -52,9 +53,11 @@ export function useFinanceData() {
       setRecords([]);
       setSettings({baseInitialBalance: 0});
       seededCategoriesRef.current = false;
+      seededRecordsRef.current = false;
       return;
     }
     seededCategoriesRef.current = false;
+    seededRecordsRef.current = false;
 
     const userDocRef = doc(db, 'users', user.uid);
 
@@ -82,7 +85,8 @@ export function useFinanceData() {
     const unsubRecords = onSnapshot(
       collection(userDocRef, 'records'),
       (snap) => {
-        if (snap.empty) {
+        if (snap.empty && !seededRecordsRef.current) {
+          seededRecordsRef.current = true;
           const currentMonth = getCurrentMonthStr();
           setDoc(doc(collection(userDocRef, 'records'), currentMonth), {
             month: currentMonth,
@@ -90,6 +94,7 @@ export function useFinanceData() {
           }).catch(console.error);
           return;
         }
+        seededRecordsRef.current = true;
         const recs = snap.docs.map(
           (d) => ({id: d.id, ...d.data()} as FinanceRecord),
         );
@@ -188,12 +193,17 @@ export function useFinanceData() {
   );
 
   const addNextMonth = useCallback(async () => {
-    if (!user || records.length === 0) return;
-    const sortedRecords = [...records].sort((a, b) =>
-      a.month.localeCompare(b.month),
-    );
-    const lastMonth = sortedRecords[sortedRecords.length - 1].month;
-    const nextMonth = getNextMonthStr(lastMonth);
+    if (!user) return;
+
+    let targetMonth: string;
+    if (records.length === 0) {
+      targetMonth = getCurrentMonthStr();
+    } else {
+      const sortedRecords = [...records].sort((a, b) =>
+        a.month.localeCompare(b.month),
+      );
+      targetMonth = getNextMonthStr(sortedRecords[sortedRecords.length - 1].month);
+    }
 
     const newValues: Record<string, number> = {};
     categories.forEach((cat) => {
@@ -202,8 +212,8 @@ export function useFinanceData() {
       }
     });
 
-    await setDoc(doc(db, 'users', user.uid, 'records', nextMonth), {
-      month: nextMonth,
+    await setDoc(doc(db, 'users', user.uid, 'records', targetMonth), {
+      month: targetMonth,
       values: newValues,
     });
   }, [user, records, categories]);
@@ -224,9 +234,14 @@ export function useFinanceData() {
     async (categoryId: string, categoryName: string) => {
       if (!user) return;
       if (
-        window.confirm(`確定要刪除分類 "${categoryName}" 嗎？此操作無法還原。`)
-      ) {
+        !window.confirm(`確定要刪除分類 "${categoryName}" 嗎？此操作無法還原。`)
+      )
+        return;
+      try {
         await deleteDoc(doc(db, 'users', user.uid, 'categories', categoryId));
+      } catch (err) {
+        console.error('Delete category failed:', err);
+        alert(`無法刪除分類: ${(err as Error).message}`);
       }
     },
     [user],
@@ -239,11 +254,16 @@ export function useFinanceData() {
       if (newName === null) return;
       const trimmed = newName.trim();
       if (trimmed === '' || trimmed === currentName) return;
-      await setDoc(
-        doc(db, 'users', user.uid, 'categories', categoryId),
-        {name: trimmed},
-        {merge: true},
-      );
+      try {
+        await setDoc(
+          doc(db, 'users', user.uid, 'categories', categoryId),
+          {name: trimmed},
+          {merge: true},
+        );
+      } catch (err) {
+        console.error('Rename category failed:', err);
+        alert(`無法重新命名: ${(err as Error).message}`);
+      }
     },
     [user],
   );
@@ -252,9 +272,14 @@ export function useFinanceData() {
     async (monthId: string) => {
       if (!user) return;
       if (
-        window.confirm(`確定要刪除 ${monthId} 的所有資料嗎？此操作無法還原。`)
-      ) {
+        !window.confirm(`確定要刪除 ${monthId} 的所有資料嗎？此操作無法還原。`)
+      )
+        return;
+      try {
         await deleteDoc(doc(db, 'users', user.uid, 'records', monthId));
+      } catch (err) {
+        console.error('Delete record failed:', err);
+        alert(`無法刪除月份: ${(err as Error).message}`);
       }
     },
     [user],
