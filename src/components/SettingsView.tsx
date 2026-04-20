@@ -1,5 +1,5 @@
 import {DragEvent} from 'react';
-import {GripVertical, Trash2} from 'lucide-react';
+import {GripVertical, Pencil, Trash2} from 'lucide-react';
 
 import type {Category, CategoryType, Settings} from '../types';
 import {DefaultAmountInput} from './DefaultAmountInput';
@@ -11,6 +11,7 @@ type Props = {
   updateBaseBalance: (val: number) => void;
   updateCategoryDefaultAmount: (id: string, amount: number | null) => void;
   deleteCategory: (id: string, name: string) => void;
+  renameCategory: (id: string, currentName: string) => void;
   addCategory: (name: string, type: CategoryType) => Promise<void>;
   reorderCategories: (type: CategoryType, fromIdx: number, toIdx: number) => void;
 };
@@ -22,6 +23,7 @@ export function SettingsView({
   updateBaseBalance,
   updateCategoryDefaultAmount,
   deleteCategory,
+  renameCategory,
   addCategory,
   reorderCategories,
 }: Props) {
@@ -75,7 +77,14 @@ export function SettingsView({
         >
           <div className="flex items-center gap-3">
             <GripVertical size={14} className="text-zinc-600" />
-            <span className="text-sm text-zinc-300">{cat.name}</span>
+            <button
+              type="button"
+              onClick={() => renameCategory(cat.id, cat.name)}
+              title="點擊以重新命名"
+              className="text-sm text-zinc-300 hover:text-indigo-400 transition-colors text-left"
+            >
+              {cat.name}
+            </button>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
@@ -88,7 +97,15 @@ export function SettingsView({
               />
             </div>
             <button
+              onClick={() => renameCategory(cat.id, cat.name)}
+              aria-label={`重新命名 ${cat.name}`}
+              className="text-zinc-600 hover:text-indigo-400 transition-colors p-1"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
               onClick={() => deleteCategory(cat.id, cat.name)}
+              aria-label={`刪除 ${cat.name}`}
               className="text-zinc-600 hover:text-red-400 transition-colors p-1"
             >
               <Trash2 size={14} />

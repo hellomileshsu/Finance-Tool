@@ -1,3 +1,5 @@
+import {Trash2} from 'lucide-react';
+
 import type {Category, ComputedRow} from '../types';
 import {formatCurrency} from '../utils/format';
 import {NumberInputCell} from './NumberInputCell';
@@ -7,6 +9,7 @@ type Props = {
   expenseCategories: Category[];
   computedData: ComputedRow[];
   updateRecordValue: (monthId: string, categoryId: string, value: number) => void;
+  deleteRecord: (monthId: string) => void;
 };
 
 export function TableView({
@@ -14,6 +17,7 @@ export function TableView({
   expenseCategories,
   computedData,
   updateRecordValue,
+  deleteRecord,
 }: Props) {
   return (
     <div className="bg-[#18181b] rounded-xl shadow-xl border border-[#27272a] overflow-hidden flex flex-col h-full max-h-[85vh]">
@@ -74,7 +78,16 @@ export function TableView({
                 className="hover:bg-zinc-800/40 transition-colors group"
               >
                 <td className="px-4 py-3 sticky left-0 bg-[#18181b] group-hover:bg-[#202024] z-10 border-r border-[#27272a] font-medium text-zinc-300 font-mono text-xs">
-                  {row.month}
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{row.month}</span>
+                    <button
+                      onClick={() => deleteRecord(row.id)}
+                      aria-label={`刪除 ${row.month}`}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-opacity p-0.5"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-right text-zinc-500 font-mono text-xs">
                   {formatCurrency(row.initialBalance)}

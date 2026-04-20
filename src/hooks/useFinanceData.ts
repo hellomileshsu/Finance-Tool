@@ -232,6 +232,34 @@ export function useFinanceData() {
     [user],
   );
 
+  const renameCategory = useCallback(
+    async (categoryId: string, currentName: string) => {
+      if (!user) return;
+      const newName = window.prompt('請輸入新的類別名稱：', currentName);
+      if (newName === null) return;
+      const trimmed = newName.trim();
+      if (trimmed === '' || trimmed === currentName) return;
+      await setDoc(
+        doc(db, 'users', user.uid, 'categories', categoryId),
+        {name: trimmed},
+        {merge: true},
+      );
+    },
+    [user],
+  );
+
+  const deleteRecord = useCallback(
+    async (monthId: string) => {
+      if (!user) return;
+      if (
+        window.confirm(`確定要刪除 ${monthId} 的所有資料嗎？此操作無法還原。`)
+      ) {
+        await deleteDoc(doc(db, 'users', user.uid, 'records', monthId));
+      }
+    },
+    [user],
+  );
+
   const updateCategoryDefaultAmount = useCallback(
     async (categoryId: string, amount: number | null) => {
       if (!user) return;
@@ -292,6 +320,8 @@ export function useFinanceData() {
     addNextMonth,
     updateBaseBalance,
     deleteCategory,
+    renameCategory,
+    deleteRecord,
     updateCategoryDefaultAmount,
     addCategory,
     reorderCategories,

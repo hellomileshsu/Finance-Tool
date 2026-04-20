@@ -36,6 +36,8 @@ export default function App() {
     addNextMonth,
     updateBaseBalance,
     deleteCategory,
+    renameCategory,
+    deleteRecord,
     updateCategoryDefaultAmount,
     addCategory,
     reorderCategories,
@@ -145,6 +147,7 @@ export default function App() {
               expenseCategories={expenseCategories}
               computedData={computedData}
               updateRecordValue={updateRecordValue}
+              deleteRecord={deleteRecord}
             />
           )}
 
@@ -171,6 +174,7 @@ export default function App() {
               updateBaseBalance={updateBaseBalance}
               updateCategoryDefaultAmount={updateCategoryDefaultAmount}
               deleteCategory={deleteCategory}
+              renameCategory={renameCategory}
               addCategory={addCategory}
               reorderCategories={reorderCategories}
             />
