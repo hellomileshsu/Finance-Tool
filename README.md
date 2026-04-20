@@ -2,19 +2,19 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# 財務預測大師 (Finance Tool)
 
-This contains everything you need to run your app locally.
+長期資產規劃與記帳應用程式。Vite + React 19 + TypeScript + Firebase (Auth + Firestore) + Tailwind v4 + Recharts。
 
-View your app in AI Studio: https://ai.studio/apps/e6c0d7a6-6dee-4668-b236-a060694695e9
+Live: https://hellomileshsu.github.io/Finance-Tool/
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+**Prerequisites:** Node.js 20+
 
+1. Install dependencies: `npm install`
+2. Run the app: `npm run dev`
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Build
+
+`npm run build` 產生 `dist/`。推到 `main` 會透過 `.github/workflows/deploy.yml` 自動部署到 GitHub Pages。
