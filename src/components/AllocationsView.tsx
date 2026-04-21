@@ -220,22 +220,22 @@ export function AllocationsView({
   }
 
   return (
-    <div className="grid grid-cols-12 gap-6 content-start">
-      <div className="col-span-12 bg-[#18181b] p-6 rounded-xl shadow-xl border border-[#27272a]">
-        <div className="flex justify-between items-start gap-4 mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-              <PiggyBank size={18} className="text-indigo-400" />
-              存款分類規劃
+    <div className="grid grid-cols-12 gap-4 sm:gap-6 content-start">
+      <div className="col-span-12 bg-[#18181b] p-4 sm:p-6 rounded-xl shadow-xl border border-[#27272a]">
+        <div className="flex justify-between items-start gap-3 mb-4 sm:mb-6">
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-zinc-100 flex items-center gap-2">
+              <PiggyBank size={18} className="text-indigo-400 shrink-0" />
+              <span className="truncate">存款分類規劃</span>
             </h3>
-            <p className="text-sm text-zinc-500">
+            <p className="text-xs sm:text-sm text-zinc-500 truncate">
               Snapshot basis · 以選定月份期末餘額為基準
             </p>
           </div>
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="bg-[#09090b] border border-[#27272a] text-zinc-300 text-xs font-mono rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+            className="bg-[#09090b] border border-[#27272a] text-zinc-300 text-xs font-mono rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all shrink-0"
           >
             {monthOptions.map((m) => (
               <option key={m} value={m}>
@@ -263,12 +263,13 @@ export function AllocationsView({
           />
         </div>
 
-        <div className="mt-4 flex items-center flex-wrap gap-3 pt-4 border-t border-[#27272a]">
-          <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 pt-4 border-t border-[#27272a]">
+          <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 shrink-0">
             每月存款速率
           </label>
           <input
             type="number"
+            inputMode="numeric"
             defaultValue={savingsRate || ''}
             key={`savings-rate-${savingsRate}`}
             placeholder="0"
@@ -277,7 +278,7 @@ export function AllocationsView({
               if (e.key === 'Enter')
                 (e.target as HTMLInputElement).blur();
             }}
-            className="w-32 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
+            className="w-full sm:w-32 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1.5 sm:py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
           />
           <span className="text-[10px] font-mono text-zinc-600">
             用於推算各目標達成月份；空白視為 0
@@ -285,14 +286,14 @@ export function AllocationsView({
         </div>
       </div>
 
-      <div className="col-span-12 bg-[#18181b] p-6 rounded-xl shadow-xl border border-[#27272a]">
+      <div className="col-span-12 bg-[#18181b] p-4 sm:p-6 rounded-xl shadow-xl border border-[#27272a]">
         <div className="flex justify-between items-start mb-4">
-          <div>
+          <div className="min-w-0">
             <h4 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <TrendingUp size={16} className="text-indigo-400" />
+              <TrendingUp size={16} className="text-indigo-400 shrink-0" />
               達成預測
             </h4>
-            <p className="text-[11px] text-zinc-500 mt-0.5">
+            <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
               依 allocation 順序累積；未來 24 個月線性外推
             </p>
           </div>
@@ -307,11 +308,11 @@ export function AllocationsView({
             [ 尚無設定目標（goal）的分類 ]
           </div>
         ) : (
-          <div className="h-72 w-full">
+          <div className="h-64 sm:h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={projectionSeries}
-                margin={{top: 5, right: 80, bottom: 5, left: 20}}
+                margin={{top: 8, right: 12, bottom: 5, left: 4}}
               >
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -321,15 +322,18 @@ export function AllocationsView({
                 <XAxis
                   dataKey="month"
                   stroke="#71717a"
-                  fontSize={11}
+                  fontSize={10}
                   tickMargin={8}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(m: number) => `+${m}m`}
+                  interval="preserveStartEnd"
+                  minTickGap={24}
                 />
                 <YAxis
                   stroke="#71717a"
-                  fontSize={11}
+                  fontSize={10}
+                  width={48}
                   tickFormatter={(val: number) => `¥${Math.round(val / 1000)}k`}
                   tickLine={false}
                   axisLine={false}
@@ -345,26 +349,30 @@ export function AllocationsView({
                   labelFormatter={(m) => `第 ${m} 個月`}
                   formatter={(val: number) => [formatCurrency(val), '預估餘額']}
                 />
-                {forecasts.map((f) => (
-                  <ReferenceLine
-                    key={f.id}
-                    y={f.cumulativeGoal}
-                    stroke="#a78bfa"
-                    strokeDasharray="4 4"
-                    label={{
-                      value: `${f.name}${
-                        f.monthsToGoal === 0
-                          ? ' · 已達成'
-                          : f.monthsToGoal !== null
-                          ? ` · ${f.monthsToGoal}m`
-                          : ''
-                      }`,
-                      position: 'right',
-                      fill: '#a78bfa',
-                      fontSize: 10,
-                    }}
-                  />
-                ))}
+                {forecasts.map((f) => {
+                  const shortName =
+                    f.name.length > 8 ? `${f.name.slice(0, 8)}…` : f.name;
+                  const suffix =
+                    f.monthsToGoal === 0
+                      ? ' · 已達成'
+                      : f.monthsToGoal !== null
+                      ? ` · ${f.monthsToGoal}m`
+                      : '';
+                  return (
+                    <ReferenceLine
+                      key={f.id}
+                      y={f.cumulativeGoal}
+                      stroke="#a78bfa"
+                      strokeDasharray="4 4"
+                      label={{
+                        value: `${shortName}${suffix}`,
+                        position: 'insideTopRight',
+                        fill: '#a78bfa',
+                        fontSize: 10,
+                      }}
+                    />
+                  );
+                })}
                 <Line
                   type="monotone"
                   dataKey="balance"
@@ -380,7 +388,7 @@ export function AllocationsView({
         )}
       </div>
 
-      <div className="col-span-12 bg-[#18181b] p-6 rounded-xl shadow-xl border border-[#27272a]">
+      <div className="col-span-12 bg-[#18181b] p-4 sm:p-6 rounded-xl shadow-xl border border-[#27272a]">
         <div className="flex justify-between items-center mb-4">
           <h4 className="text-sm font-semibold text-zinc-100">
             進行中 ({resolvedActive.length})
@@ -414,8 +422,8 @@ export function AllocationsView({
                   key={a.id}
                   className="bg-zinc-900/40 border border-[#27272a] rounded-lg p-3"
                 >
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={() => reorderAllocations(idx, idx - 1)}
                         disabled={idx === 0}
@@ -436,74 +444,19 @@ export function AllocationsView({
 
                     <button
                       onClick={() => handleRename(a)}
-                      className="flex items-center gap-1.5 text-zinc-100 text-sm font-medium hover:text-indigo-300 transition-colors"
+                      className="flex items-center gap-1.5 text-zinc-100 text-sm font-medium hover:text-indigo-300 transition-colors min-w-0 flex-1"
                     >
-                      {a.name}
-                      <Pencil
-                        size={12}
-                        className="text-zinc-600 group-hover:text-zinc-400"
-                      />
+                      <span className="truncate">{a.name}</span>
+                      <Pencil size={12} className="text-zinc-600 shrink-0" />
                     </button>
 
-                    <button
-                      onClick={() => handleToggleMode(a)}
-                      aria-label="切換目標模式"
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
-                        isPercent
-                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      }`}
-                    >
-                      {isPercent ? 'PERCENT' : 'FIXED'}
-                    </button>
-
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        defaultValue={a.targetValue}
-                        key={`${a.id}-${a.targetMode}-${a.targetValue}`}
-                        onBlur={(e) => handleChangeValue(a, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter')
-                            (e.target as HTMLInputElement).blur();
-                        }}
-                        className="w-28 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
-                      />
-                      {isPercent && (
-                        <span className="text-zinc-500 font-mono text-xs">
-                          %
-                        </span>
-                      )}
-                    </div>
-
-                    {isPercent && (
-                      <span className="text-xs text-zinc-500 font-mono">
-                        ≈ {formatCurrency(a.resolvedAmount)}
-                      </span>
+                    {forecast && (
+                      <div className="shrink-0 hidden sm:block">
+                        <ForecastBadge months={forecast.monthsToGoal} />
+                      </div>
                     )}
 
-                    <div className="flex items-center gap-1 text-xs text-zinc-500">
-                      <Target size={12} className="text-zinc-600" />
-                      <span className="font-mono text-[10px] uppercase tracking-wider">
-                        Goal
-                      </span>
-                      <input
-                        type="number"
-                        defaultValue={a.goalAmount ?? ''}
-                        key={`${a.id}-goal-${a.goalAmount ?? ''}`}
-                        placeholder="—"
-                        onBlur={(e) => handleChangeGoal(a, e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter')
-                            (e.target as HTMLInputElement).blur();
-                        }}
-                        className="w-24 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
-                      />
-                    </div>
-
-                    {forecast && <ForecastBadge months={forecast.monthsToGoal} />}
-
-                    <div className="ml-auto flex items-center gap-1">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={() => archiveAllocation(a.id, true)}
                         aria-label="封存"
@@ -520,6 +473,72 @@ export function AllocationsView({
                         <Trash2 size={14} />
                       </button>
                     </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => handleToggleMode(a)}
+                      aria-label="切換目標模式"
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors shrink-0 ${
+                        isPercent
+                          ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      }`}
+                    >
+                      {isPercent ? 'PERCENT' : 'FIXED'}
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        defaultValue={a.targetValue}
+                        key={`${a.id}-${a.targetMode}-${a.targetValue}`}
+                        onBlur={(e) => handleChangeValue(a, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter')
+                            (e.target as HTMLInputElement).blur();
+                        }}
+                        className="w-24 sm:w-28 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
+                      />
+                      {isPercent && (
+                        <span className="text-zinc-500 font-mono text-xs">
+                          %
+                        </span>
+                      )}
+                    </div>
+
+                    {isPercent && (
+                      <span className="text-xs text-zinc-500 font-mono truncate">
+                        ≈ {formatCurrency(a.resolvedAmount)}
+                      </span>
+                    )}
+
+                    <div className="flex items-center gap-1 text-xs text-zinc-500">
+                      <Target size={12} className="text-zinc-600 shrink-0" />
+                      <span className="font-mono text-[10px] uppercase tracking-wider">
+                        Goal
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        defaultValue={a.goalAmount ?? ''}
+                        key={`${a.id}-goal-${a.goalAmount ?? ''}`}
+                        placeholder="—"
+                        onBlur={(e) => handleChangeGoal(a, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter')
+                            (e.target as HTMLInputElement).blur();
+                        }}
+                        className="w-20 sm:w-24 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    {forecast && (
+                      <div className="sm:hidden">
+                        <ForecastBadge months={forecast.monthsToGoal} />
+                      </div>
+                    )}
                   </div>
 
                   {hasGoal && forecast ? (
@@ -565,7 +584,7 @@ export function AllocationsView({
         )}
       </div>
 
-      <div className="col-span-12 bg-[#18181b] p-6 rounded-xl shadow-xl border border-[#27272a]">
+      <div className="col-span-12 bg-[#18181b] p-4 sm:p-6 rounded-xl shadow-xl border border-[#27272a]">
         <button
           onClick={() => setShowArchived((v) => !v)}
           className="w-full flex items-center justify-between text-sm font-semibold text-zinc-300 hover:text-zinc-100 transition-colors"
