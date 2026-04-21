@@ -3,23 +3,26 @@ import {
   LogOut,
   Minus,
   PieChart as PieChartIcon,
+  PiggyBank,
   Plus,
   Settings,
   Table as TableIcon,
   TrendingUp,
 } from 'lucide-react';
 
+import {AllocationsView} from './components/AllocationsView';
 import {SettingsView} from './components/SettingsView';
 import {TableView} from './components/TableView';
 import {useFinanceData} from './hooks/useFinanceData';
 
 const ChartsView = lazy(() => import('./components/ChartsView'));
 
-type Tab = 'table' | 'charts' | 'settings';
+type Tab = 'table' | 'charts' | 'allocations' | 'settings';
 
 const TAB_LABELS: Record<Tab, string> = {
   table: 'Financial_Overview_Grid',
   charts: 'Analytics_Dashboard',
+  allocations: 'Savings_Allocation_Planner',
   settings: 'System_Configuration',
 };
 
@@ -31,6 +34,7 @@ export default function App() {
     expenseCategories,
     settings,
     computedData,
+    allocations,
     login,
     logout,
     updateRecordValue,
@@ -44,6 +48,11 @@ export default function App() {
     reorderCategories,
     toggleCategoryGroup,
     updateCategoryItems,
+    addAllocation,
+    updateAllocation,
+    deleteAllocation,
+    archiveAllocation,
+    reorderAllocations,
   } = useFinanceData();
   const [activeTab, setActiveTab] = useState<Tab>('table');
 
@@ -99,6 +108,13 @@ export default function App() {
           <button onClick={() => setActiveTab('charts')} className={navButtonClass('charts')}>
             <PieChartIcon size={18} />
             數據分析看板
+          </button>
+          <button
+            onClick={() => setActiveTab('allocations')}
+            className={navButtonClass('allocations')}
+          >
+            <PiggyBank size={18} />
+            存款分類規劃
           </button>
           <button onClick={() => setActiveTab('settings')} className={navButtonClass('settings')}>
             <Settings size={18} />
@@ -177,6 +193,18 @@ export default function App() {
                 expenseCategories={expenseCategories}
               />
             </Suspense>
+          )}
+
+          {activeTab === 'allocations' && (
+            <AllocationsView
+              allocations={allocations}
+              computedData={computedData}
+              addAllocation={addAllocation}
+              updateAllocation={updateAllocation}
+              deleteAllocation={deleteAllocation}
+              archiveAllocation={archiveAllocation}
+              reorderAllocations={reorderAllocations}
+            />
           )}
 
           {activeTab === 'settings' && (

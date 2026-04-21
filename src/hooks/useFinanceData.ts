@@ -18,6 +18,8 @@ import {
 
 import {auth, db} from '../firebase';
 import type {
+  Allocation,
+  AllocationTargetMode,
   Category,
   ComputedRow,
   FinanceRecord,
@@ -42,6 +44,7 @@ export function useFinanceData() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [records, setRecords] = useState<FinanceRecord[]>([]);
   const [settings, setSettings] = useState<Settings>({baseInitialBalance: 0});
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
 
   const seededCategoriesRef = useRef(false);
   const seededRecordsRef = useRef(false);
@@ -59,6 +62,7 @@ export function useFinanceData() {
       setCategories([]);
       setRecords([]);
       setSettings({baseInitialBalance: 0});
+      setAllocations([]);
       seededCategoriesRef.current = false;
       seededRecordsRef.current = false;
       return;
@@ -124,10 +128,22 @@ export function useFinanceData() {
       console.error,
     );
 
+    const unsubAllocations = onSnapshot(
+      collection(userDocRef, 'allocations'),
+      (snap) => {
+        const allocs = snap.docs
+          .map((d) => ({id: d.id, ...d.data()} as Allocation))
+          .sort((a, b) => a.order - b.order);
+        setAllocations(allocs);
+      },
+      console.error,
+    );
+
     return () => {
       unsubCategories();
       unsubRecords();
       unsubSettings();
+      unsubAllocations();
     };
   }, [user]);
 
@@ -392,6 +408,117 @@ export function useFinanceData() {
     [user, incomeCategories, expenseCategories],
   );
 
+  const addAllocation = useCallback(
+    async (
+      name: string,
+      targetMode: AllocationTargetMode,
+      targetValue: number,
+    ) => {
+      if (!user) return;
+      const id = 'alloc_' + Date.now();
+      try {
+        await setDoc(doc(db, 'users', user.uid, 'allocations', id), {
+          id,
+          name,
+          targetMode,
+          targetValue,
+          order: allocations.length + 1,
+          archived: false,
+        });
+      } catch (err) {
+        console.error('Add allocation failed:', err);
+        alert(`無法新增分類: ${(err as Error).message}`);
+      }
+    },
+    [user, allocations],
+  );
+
+  const updateAllocation = useCallback(
+    async (
+      id: string,
+      patch: Partial<Omit<Allocation, 'id'>>,
+    ) => {
+      if (!user) return;
+      try {
+        await setDoc(
+          doc(db, 'users', user.uid, 'allocations', id),
+          patch,
+          {merge: true},
+        );
+      } catch (err) {
+        console.error('Update allocation failed:', err);
+        alert(`無法更新分類: ${(err as Error).message}`);
+      }
+    },
+    [user],
+  );
+
+  const deleteAllocation = useCallback(
+    async (id: string, name: string) => {
+      if (!user) return;
+      if (
+        !window.confirm(`確定要刪除存款分類 "${name}" 嗎？此操作無法還原。`)
+      )
+        return;
+      try {
+        await deleteDoc(doc(db, 'users', user.uid, 'allocations', id));
+      } catch (err) {
+        console.error('Delete allocation failed:', err);
+        alert(`無法刪除分類: ${(err as Error).message}`);
+      }
+    },
+    [user],
+  );
+
+  const archiveAllocation = useCallback(
+    async (id: string, archive: boolean) => {
+      if (!user) return;
+      try {
+        await setDoc(
+          doc(db, 'users', user.uid, 'allocations', id),
+          archive
+            ? {archived: true, archivedAt: Date.now()}
+            : {archived: false, archivedAt: deleteField()},
+          {merge: true},
+        );
+      } catch (err) {
+        console.error('Archive allocation failed:', err);
+        alert(`無法封存分類: ${(err as Error).message}`);
+      }
+    },
+    [user],
+  );
+
+  const reorderAllocations = useCallback(
+    async (fromIdx: number, toIdx: number) => {
+      if (!user || fromIdx === toIdx) return;
+      const activeList = allocations.filter((a) => !a.archived);
+      if (
+        fromIdx < 0 ||
+        fromIdx >= activeList.length ||
+        toIdx < 0 ||
+        toIdx >= activeList.length
+      )
+        return;
+      const list = [...activeList];
+      const [dragged] = list.splice(fromIdx, 1);
+      list.splice(toIdx, 0, dragged);
+      try {
+        const batch = writeBatch(db);
+        list.forEach((a, idx) => {
+          batch.update(doc(db, 'users', user.uid, 'allocations', a.id), {
+            order: idx + 1,
+          });
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error('Reorder allocations failed:', err);
+        alert(`無法重新排序: ${(err as Error).message}`);
+      }
+    },
+    [user, allocations],
+  );
+
   return {
     user,
     loading,
@@ -400,6 +527,7 @@ export function useFinanceData() {
     expenseCategories,
     settings,
     computedData,
+    allocations,
     login,
     logout,
     updateRecordValue,
@@ -413,5 +541,10 @@ export function useFinanceData() {
     reorderCategories,
     toggleCategoryGroup,
     updateCategoryItems,
+    addAllocation,
+    updateAllocation,
+    deleteAllocation,
+    archiveAllocation,
+    reorderAllocations,
   };
 }
