@@ -40,6 +40,18 @@ service cloud.firestore {
              data.keys().size() == 1 &&
              data.baseInitialBalance is number;
     }
+
+    function isValidAllocation(data) {
+      return data.keys().hasAll(['id', 'name', 'targetMode', 'targetValue', 'order', 'archived']) &&
+             data.keys().size() <= 7 &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.targetMode is string && (data.targetMode == 'fixed' || data.targetMode == 'percent') &&
+             data.targetValue is number &&
+             data.order is number &&
+             data.archived is bool &&
+             data.get('archivedAt', 0) is number;
+    }
     
     // --- Paths & Rules ---
     match /users/{userId} {
@@ -71,6 +83,16 @@ service cloud.firestore {
           incoming().diff(existing()).affectedKeys().hasOnly(['baseInitialBalance'])
         );
         allow delete: if isOwner(userId) && settingId == 'general';
+      }
+
+      match /allocations/{allocationId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(allocationId) && isValidAllocation(incoming());
+        allow update: if isOwner(userId) && isValidId(allocationId) && isValidAllocation(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'targetMode', 'targetValue', 'order', 'archived', 'archivedAt']) &&
+          incoming().id == existing().id
+        );
+        allow delete: if isOwner(userId) && isValidId(allocationId);
       }
     }
   }

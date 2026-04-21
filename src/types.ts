@@ -39,3 +39,15 @@ export type ComputedRow = FinanceRecord & {
   netValue: number;
   finalBalance: number;
 };
+
+export type AllocationTargetMode = 'fixed' | 'percent';
+
+export type Allocation = {
+  id: string;
+  name: string;
+  targetMode: AllocationTargetMode;
+  targetValue: number;
+  order: number;
+  archived: boolean;
+  archivedAt?: number;
+};
