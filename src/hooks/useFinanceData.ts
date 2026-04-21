@@ -268,22 +268,19 @@ export function useFinanceData() {
     [user],
   );
 
-  const deleteRecord = useCallback(
-    async (monthId: string) => {
-      if (!user) return;
-      if (
-        !window.confirm(`確定要刪除 ${monthId} 的所有資料嗎？此操作無法還原。`)
-      )
-        return;
-      try {
-        await deleteDoc(doc(db, 'users', user.uid, 'records', monthId));
-      } catch (err) {
-        console.error('Delete record failed:', err);
-        alert(`無法刪除月份: ${(err as Error).message}`);
-      }
-    },
-    [user],
-  );
+  const removeLastMonth = useCallback(async () => {
+    if (!user || records.length === 0) return;
+    const sorted = [...records].sort((a, b) => a.month.localeCompare(b.month));
+    const last = sorted[sorted.length - 1];
+    if (!window.confirm(`確定要刪除最新月份 ${last.month} 嗎？此操作無法還原。`))
+      return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'records', last.id));
+    } catch (err) {
+      console.error('Delete last month failed:', err);
+      alert(`無法刪除月份: ${(err as Error).message}`);
+    }
+  }, [user, records]);
 
   const updateCategoryDefaultAmount = useCallback(
     async (categoryId: string, amount: number | null) => {
@@ -346,7 +343,7 @@ export function useFinanceData() {
     updateBaseBalance,
     deleteCategory,
     renameCategory,
-    deleteRecord,
+    removeLastMonth,
     updateCategoryDefaultAmount,
     addCategory,
     reorderCategories,

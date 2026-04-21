@@ -1,6 +1,7 @@
 import {lazy, Suspense, useState} from 'react';
 import {
   LogOut,
+  Minus,
   PieChart as PieChartIcon,
   Plus,
   Settings,
@@ -37,7 +38,7 @@ export default function App() {
     updateBaseBalance,
     deleteCategory,
     renameCategory,
-    deleteRecord,
+    removeLastMonth,
     updateCategoryDefaultAmount,
     addCategory,
     reorderCategories,
@@ -129,13 +130,23 @@ export default function App() {
 
           <div className="flex items-center gap-6">
             {activeTab === 'table' && (
-              <button
-                onClick={addNextMonth}
-                className="bg-zinc-100 text-zinc-950 px-4 py-1.5 rounded text-sm font-semibold hover:bg-white transition-colors flex items-center gap-2 shadow-sm"
-              >
-                <Plus size={16} />
-                新增下個月
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={removeLastMonth}
+                  disabled={computedData.length === 0}
+                  className="bg-zinc-800 text-zinc-300 px-4 py-1.5 rounded text-sm font-semibold hover:bg-zinc-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Minus size={16} />
+                  減去最新月份
+                </button>
+                <button
+                  onClick={addNextMonth}
+                  className="bg-zinc-100 text-zinc-950 px-4 py-1.5 rounded text-sm font-semibold hover:bg-white transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <Plus size={16} />
+                  新增下個月
+                </button>
+              </div>
             )}
           </div>
         </header>
@@ -147,7 +158,6 @@ export default function App() {
               expenseCategories={expenseCategories}
               computedData={computedData}
               updateRecordValue={updateRecordValue}
-              deleteRecord={deleteRecord}
             />
           )}
 
