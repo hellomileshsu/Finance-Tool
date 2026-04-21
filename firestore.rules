@@ -19,12 +19,13 @@ service cloud.firestore {
     // --- Validation Blueprints ---
     function isValidCategory(data) {
       return data.keys().hasAll(['id', 'name', 'type', 'order']) &&
-             data.keys().size() <= 5 &&
+             data.keys().size() <= 6 &&
              data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
              data.type is string && (data.type == 'income' || data.type == 'expense') &&
              data.order is number &&
-             data.get('defaultAmount', 0) is number;
+             data.get('defaultAmount', 0) is number &&
+             data.get('isGroup', false) is bool;
     }
 
     function isValidRecord(data) {
@@ -47,7 +48,7 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidId(categoryId) && isValidCategory(incoming());
         allow update: if isOwner(userId) && isValidId(categoryId) && isValidCategory(incoming()) && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'type', 'order', 'defaultAmount']) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'type', 'order', 'defaultAmount', 'isGroup']) &&
           incoming().id == existing().id // Immutable ID
         );
         allow delete: if isOwner(userId) && isValidId(categoryId);
