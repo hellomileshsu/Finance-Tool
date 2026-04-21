@@ -1,3 +1,4 @@
+import {useMemo, useState} from 'react';
 import {TrendingUp} from 'lucide-react';
 import {
   Bar,
@@ -35,16 +36,33 @@ type Props = {
   expenseCategories: Category[];
 };
 
+const ALL_MONTHS = '__all__';
+
 export default function ChartsView({computedData, expenseCategories}: Props) {
-  const pieData = expenseCategories
-    .map((cat) => {
-      const total = computedData.reduce(
-        (sum, row) => sum + (row.values[cat.id] || 0),
-        0,
-      );
-      return {name: cat.name, value: total};
-    })
-    .filter((d) => d.value > 0);
+  const [selectedMonth, setSelectedMonth] = useState<string>(ALL_MONTHS);
+
+  const monthOptions = useMemo(
+    () =>
+      [...computedData]
+        .map((row) => row.month)
+        .sort((a, b) => b.localeCompare(a)),
+    [computedData],
+  );
+
+  const isAllMonths =
+    selectedMonth === ALL_MONTHS || !monthOptions.includes(selectedMonth);
+
+  const pieData = useMemo(() => {
+    const rows = isAllMonths
+      ? computedData
+      : computedData.filter((row) => row.month === selectedMonth);
+    return expenseCategories
+      .map((cat) => ({
+        name: cat.name,
+        value: rows.reduce((sum, row) => sum + (row.values[cat.id] || 0), 0),
+      }))
+      .filter((d) => d.value > 0);
+  }, [computedData, expenseCategories, selectedMonth, isAllMonths]);
 
   return (
     <div className="grid grid-cols-12 gap-6 content-start">
@@ -165,9 +183,25 @@ export default function ChartsView({computedData, expenseCategories}: Props) {
       </div>
 
       <div className="col-span-12 lg:col-span-5 bg-[#18181b] p-6 rounded-xl shadow-xl border border-[#27272a]">
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-zinc-100">全局支出分佈</h3>
-          <p className="text-xs text-zinc-500 mt-1">累積分類支出</p>
+        <div className="flex justify-between items-start gap-4 mb-6">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-100">全局支出分佈</h3>
+            <p className="text-xs text-zinc-500 mt-1">
+              {isAllMonths ? '累積分類支出' : `${selectedMonth} 分類支出`}
+            </p>
+          </div>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="bg-[#09090b] border border-[#27272a] text-zinc-300 text-xs font-mono rounded px-2 py-1.5 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+          >
+            <option value={ALL_MONTHS}>全部月份</option>
+            {monthOptions.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="h-64">
           {pieData.length === 0 ? (
