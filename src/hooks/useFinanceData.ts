@@ -255,6 +255,18 @@ export function useFinanceData() {
     [user],
   );
 
+  const updateSavingsRate = useCallback(
+    async (val: number) => {
+      if (!user) return;
+      await setDoc(
+        doc(db, 'users', user.uid, 'settings', 'general'),
+        {monthlySavingsRate: val},
+        {merge: true},
+      );
+    },
+    [user],
+  );
+
   const deleteCategory = useCallback(
     async (categoryId: string, categoryName: string) => {
       if (!user) return;
@@ -533,6 +545,7 @@ export function useFinanceData() {
     updateRecordValue,
     addNextMonth,
     updateBaseBalance,
+    updateSavingsRate,
     deleteCategory,
     renameCategory,
     removeLastMonth,

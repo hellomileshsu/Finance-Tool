@@ -37,20 +37,22 @@ service cloud.firestore {
 
     function isValidSettings(data) {
       return data.keys().hasAll(['baseInitialBalance']) &&
-             data.keys().size() == 1 &&
-             data.baseInitialBalance is number;
+             data.keys().size() <= 2 &&
+             data.baseInitialBalance is number &&
+             data.get('monthlySavingsRate', 0) is number;
     }
 
     function isValidAllocation(data) {
       return data.keys().hasAll(['id', 'name', 'targetMode', 'targetValue', 'order', 'archived']) &&
-             data.keys().size() <= 7 &&
+             data.keys().size() <= 8 &&
              data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
              data.targetMode is string && (data.targetMode == 'fixed' || data.targetMode == 'percent') &&
              data.targetValue is number &&
              data.order is number &&
              data.archived is bool &&
-             data.get('archivedAt', 0) is number;
+             data.get('archivedAt', 0) is number &&
+             data.get('goalAmount', 0) is number;
     }
     
     // --- Paths & Rules ---
@@ -80,7 +82,7 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && settingId == 'general' && isValidSettings(incoming());
         allow update: if isOwner(userId) && settingId == 'general' && isValidSettings(incoming()) && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['baseInitialBalance'])
+          incoming().diff(existing()).affectedKeys().hasOnly(['baseInitialBalance', 'monthlySavingsRate'])
         );
         allow delete: if isOwner(userId) && settingId == 'general';
       }
@@ -89,7 +91,7 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidId(allocationId) && isValidAllocation(incoming());
         allow update: if isOwner(userId) && isValidId(allocationId) && isValidAllocation(incoming()) && (
-          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'targetMode', 'targetValue', 'order', 'archived', 'archivedAt']) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'targetMode', 'targetValue', 'order', 'archived', 'archivedAt', 'goalAmount']) &&
           incoming().id == existing().id
         );
         allow delete: if isOwner(userId) && isValidId(allocationId);
