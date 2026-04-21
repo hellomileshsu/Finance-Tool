@@ -6,12 +6,26 @@ export type Category = {
   type: CategoryType;
   order: number;
   defaultAmount?: number;
+  isGroup?: boolean;
 };
+
+export type GroupItem = {
+  id: string;
+  name: string;
+  amount: number;
+};
+
+export type GroupValue = {
+  total: number;
+  items: GroupItem[];
+};
+
+export type RecordValue = number | GroupValue;
 
 export type FinanceRecord = {
   id: string;
   month: string;
-  values: Record<string, number>;
+  values: Record<string, RecordValue>;
 };
 
 export type Settings = {

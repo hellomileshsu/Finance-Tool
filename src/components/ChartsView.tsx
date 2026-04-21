@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 
 import type {Category, ComputedRow} from '../types';
+import {getAmount} from '../utils/finance';
 import {CustomBarTooltip, CustomLineTooltip, CustomPieTooltip} from './Tooltips';
 
 const PIE_COLORS = [
@@ -59,7 +60,7 @@ export default function ChartsView({computedData, expenseCategories}: Props) {
     return expenseCategories
       .map((cat) => ({
         name: cat.name,
-        value: rows.reduce((sum, row) => sum + (row.values[cat.id] || 0), 0),
+        value: rows.reduce((sum, row) => sum + getAmount(row.values[cat.id]), 0),
       }))
       .filter((d) => d.value > 0);
   }, [computedData, expenseCategories, selectedMonth, isAllMonths]);

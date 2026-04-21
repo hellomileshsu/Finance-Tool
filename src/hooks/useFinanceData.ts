@@ -17,7 +17,14 @@ import {
 } from 'firebase/firestore';
 
 import {auth, db} from '../firebase';
-import type {Category, ComputedRow, FinanceRecord, Settings} from '../types';
+import type {
+  Category,
+  ComputedRow,
+  FinanceRecord,
+  GroupItem,
+  Settings,
+} from '../types';
+import {getAmount, sumItems} from '../utils/finance';
 import {getCurrentMonthStr, getNextMonthStr} from '../utils/format';
 
 const DEFAULT_CATEGORIES: Category[] = [
@@ -146,10 +153,10 @@ export function useFinanceData() {
       let totalExpense = 0;
 
       incomeCategories.forEach((cat) => {
-        totalIncome += values[cat.id] || 0;
+        totalIncome += getAmount(values[cat.id]);
       });
       expenseCategories.forEach((cat) => {
-        totalExpense += values[cat.id] || 0;
+        totalExpense += getAmount(values[cat.id]);
       });
 
       const netValue = totalIncome - totalExpense;
@@ -205,9 +212,11 @@ export function useFinanceData() {
       targetMonth = getNextMonthStr(sortedRecords[sortedRecords.length - 1].month);
     }
 
-    const newValues: Record<string, number> = {};
+    const newValues: FinanceRecord['values'] = {};
     categories.forEach((cat) => {
-      if (cat.defaultAmount && cat.defaultAmount > 0) {
+      if (cat.isGroup) {
+        newValues[cat.id] = {total: 0, items: []};
+      } else if (cat.defaultAmount && cat.defaultAmount > 0) {
         newValues[cat.id] = cat.defaultAmount;
       }
     });
@@ -310,6 +319,61 @@ export function useFinanceData() {
     [user, incomeCategories, expenseCategories],
   );
 
+  const toggleCategoryGroup = useCallback(
+    async (categoryId: string, nextIsGroup: boolean) => {
+      if (!user) return;
+      const modeLabel = nextIsGroup ? '明細模式 (group)' : '單值模式 (flat)';
+      if (
+        !window.confirm(
+          `切換為${modeLabel}會清空此類別在所有月份的已輸入資料，是否繼續？`,
+        )
+      )
+        return;
+      try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'users', user.uid, 'categories', categoryId), {
+          isGroup: nextIsGroup,
+        });
+        records.forEach((record) => {
+          if (record.values && categoryId in record.values) {
+            const reset = nextIsGroup ? {total: 0, items: []} : 0;
+            batch.set(
+              doc(db, 'users', user.uid, 'records', record.id),
+              {values: {[categoryId]: reset}},
+              {merge: true},
+            );
+          }
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error('Toggle category group failed:', err);
+        alert(`無法切換模式: ${(err as Error).message}`);
+      }
+    },
+    [user, records],
+  );
+
+  const updateCategoryItems = useCallback(
+    async (monthId: string, categoryId: string, items: GroupItem[]) => {
+      if (!user) return;
+      const recordRef = doc(db, 'users', user.uid, 'records', monthId);
+      const existingRecord = records.find((r) => r.id === monthId);
+      const newValues = {...(existingRecord?.values || {})};
+      newValues[categoryId] = {total: sumItems(items), items};
+      try {
+        await setDoc(
+          recordRef,
+          {month: monthId, values: newValues},
+          {merge: true},
+        );
+      } catch (err) {
+        console.error('Update category items failed:', err);
+        alert(`無法儲存明細: ${(err as Error).message}`);
+      }
+    },
+    [user, records],
+  );
+
   const reorderCategories = useCallback(
     async (type: 'income' | 'expense', fromIdx: number, toIdx: number) => {
       if (!user) return;
@@ -347,5 +411,7 @@ export function useFinanceData() {
     updateCategoryDefaultAmount,
     addCategory,
     reorderCategories,
+    toggleCategoryGroup,
+    updateCategoryItems,
   };
 }

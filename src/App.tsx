@@ -42,6 +42,8 @@ export default function App() {
     updateCategoryDefaultAmount,
     addCategory,
     reorderCategories,
+    toggleCategoryGroup,
+    updateCategoryItems,
   } = useFinanceData();
   const [activeTab, setActiveTab] = useState<Tab>('table');
 
@@ -158,6 +160,7 @@ export default function App() {
               expenseCategories={expenseCategories}
               computedData={computedData}
               updateRecordValue={updateRecordValue}
+              updateCategoryItems={updateCategoryItems}
             />
           )}
 
@@ -187,6 +190,7 @@ export default function App() {
               renameCategory={renameCategory}
               addCategory={addCategory}
               reorderCategories={reorderCategories}
+              toggleCategoryGroup={toggleCategoryGroup}
             />
           )}
         </div>

@@ -14,6 +14,7 @@ type Props = {
   renameCategory: (id: string, currentName: string) => void;
   addCategory: (name: string, type: CategoryType) => Promise<void>;
   reorderCategories: (type: CategoryType, fromIdx: number, toIdx: number) => void;
+  toggleCategoryGroup: (id: string, next: boolean) => void;
 };
 
 export function SettingsView({
@@ -26,6 +27,7 @@ export function SettingsView({
   renameCategory,
   addCategory,
   reorderCategories,
+  toggleCategoryGroup,
 }: Props) {
   const handleDragStart = (
     e: DragEvent<HTMLLIElement>,
@@ -87,15 +89,29 @@ export function SettingsView({
             </button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
-                自動：
-              </span>
-              <DefaultAmountInput
-                value={cat.defaultAmount}
-                onCommit={(amount) => updateCategoryDefaultAmount(cat.id, amount)}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => toggleCategoryGroup(cat.id, !cat.isGroup)}
+              title={cat.isGroup ? '切換為單值模式' : '切換為明細模式'}
+              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors ${
+                cat.isGroup
+                  ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20'
+                  : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300'
+              }`}
+            >
+              {cat.isGroup ? 'GROUP' : 'FLAT'}
+            </button>
+            {!cat.isGroup && (
+              <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
+                  自動：
+                </span>
+                <DefaultAmountInput
+                  value={cat.defaultAmount}
+                  onCommit={(amount) => updateCategoryDefaultAmount(cat.id, amount)}
+                />
+              </div>
+            )}
             <button
               onClick={() => renameCategory(cat.id, cat.name)}
               aria-label={`重新命名 ${cat.name}`}
