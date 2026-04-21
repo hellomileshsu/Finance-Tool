@@ -9,19 +9,34 @@ import {
   Pencil,
   PiggyBank,
   Plus,
+  Target,
   Trash2,
+  TrendingUp,
 } from 'lucide-react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import type {
   Allocation,
   AllocationTargetMode,
   ComputedRow,
+  Settings,
 } from '../types';
 import {formatCurrency} from '../utils/format';
+import {buildProjectionSeries, computeForecasts} from '../utils/projection';
 
 type Props = {
   allocations: Allocation[];
   computedData: ComputedRow[];
+  settings: Settings;
   addAllocation: (
     name: string,
     targetMode: AllocationTargetMode,
@@ -34,17 +49,21 @@ type Props = {
   deleteAllocation: (id: string, name: string) => Promise<void>;
   archiveAllocation: (id: string, archive: boolean) => Promise<void>;
   reorderAllocations: (fromIdx: number, toIdx: number) => Promise<void>;
+  updateSavingsRate: (val: number) => Promise<void>;
 };
 
 export function AllocationsView({
   allocations,
   computedData,
+  settings,
   addAllocation,
   updateAllocation,
   deleteAllocation,
   archiveAllocation,
   reorderAllocations,
+  updateSavingsRate,
 }: Props) {
+  const savingsRate = settings.monthlySavingsRate ?? 0;
   const monthOptions = useMemo(
     () =>
       [...computedData]
@@ -101,6 +120,28 @@ export function AllocationsView({
   );
   const freeBalance = baseBalance - totalAllocated;
 
+  const forecasts = useMemo(
+    () => computeForecasts(activeAllocations, baseBalance, savingsRate),
+    [activeAllocations, baseBalance, savingsRate],
+  );
+  const forecastById = useMemo(() => {
+    const map = new Map<string, (typeof forecasts)[number]>();
+    forecasts.forEach((f) => map.set(f.id, f));
+    return map;
+  }, [forecasts]);
+  const projectionSeries = useMemo(
+    () => buildProjectionSeries(baseBalance, savingsRate, 24),
+    [baseBalance, savingsRate],
+  );
+  const maxGoal = forecasts.length
+    ? forecasts[forecasts.length - 1].cumulativeGoal
+    : 0;
+  const projectionYMax = Math.max(
+    projectionSeries[projectionSeries.length - 1]?.balance ?? baseBalance,
+    maxGoal,
+    baseBalance,
+  );
+
   const handleAdd = async () => {
     const name = window.prompt('請輸入存款分類名稱（例如：緊急備用金）：');
     if (name === null) return;
@@ -148,6 +189,22 @@ export function AllocationsView({
     if (a.targetMode === 'percent' && num > 100) return;
     if (num === a.targetValue) return;
     await updateAllocation(a.id, {targetValue: num});
+  };
+
+  const handleChangeGoal = async (a: Allocation, raw: string) => {
+    const trimmed = raw.trim();
+    const num = trimmed === '' ? 0 : parseFloat(trimmed);
+    if (!isFinite(num) || num < 0) return;
+    if (num === (a.goalAmount ?? 0)) return;
+    await updateAllocation(a.id, {goalAmount: num});
+  };
+
+  const handleChangeSavingsRate = async (raw: string) => {
+    const trimmed = raw.trim();
+    const num = trimmed === '' ? 0 : parseFloat(trimmed);
+    if (!isFinite(num) || num < 0) return;
+    if (num === savingsRate) return;
+    await updateSavingsRate(num);
   };
 
   if (computedData.length === 0) {
@@ -205,6 +262,122 @@ export function AllocationsView({
             tone={freeBalance < 0 ? 'negative' : 'positive'}
           />
         </div>
+
+        <div className="mt-4 flex items-center flex-wrap gap-3 pt-4 border-t border-[#27272a]">
+          <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            每月存款速率
+          </label>
+          <input
+            type="number"
+            defaultValue={savingsRate || ''}
+            key={`savings-rate-${savingsRate}`}
+            placeholder="0"
+            onBlur={(e) => handleChangeSavingsRate(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter')
+                (e.target as HTMLInputElement).blur();
+            }}
+            className="w-32 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
+          />
+          <span className="text-[10px] font-mono text-zinc-600">
+            用於推算各目標達成月份；空白視為 0
+          </span>
+        </div>
+      </div>
+
+      <div className="col-span-12 bg-[#18181b] p-6 rounded-xl shadow-xl border border-[#27272a]">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h4 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+              <TrendingUp size={16} className="text-indigo-400" />
+              達成預測
+            </h4>
+            <p className="text-[11px] text-zinc-500 mt-0.5">
+              依 allocation 順序累積；未來 24 個月線性外推
+            </p>
+          </div>
+        </div>
+
+        {savingsRate <= 0 ? (
+          <div className="text-center py-10 text-zinc-600 font-mono text-xs">
+            [ 請先輸入每月存款速率 ]
+          </div>
+        ) : forecasts.length === 0 ? (
+          <div className="text-center py-10 text-zinc-600 font-mono text-xs">
+            [ 尚無設定目標（goal）的分類 ]
+          </div>
+        ) : (
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={projectionSeries}
+                margin={{top: 5, right: 80, bottom: 5, left: 20}}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="#27272a"
+                />
+                <XAxis
+                  dataKey="month"
+                  stroke="#71717a"
+                  fontSize={11}
+                  tickMargin={8}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(m: number) => `+${m}m`}
+                />
+                <YAxis
+                  stroke="#71717a"
+                  fontSize={11}
+                  tickFormatter={(val: number) => `¥${Math.round(val / 1000)}k`}
+                  tickLine={false}
+                  axisLine={false}
+                  domain={[0, Math.ceil(projectionYMax * 1.1)]}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#18181b',
+                    border: '1px solid #27272a',
+                    borderRadius: 6,
+                    fontSize: 12,
+                  }}
+                  labelFormatter={(m) => `第 ${m} 個月`}
+                  formatter={(val: number) => [formatCurrency(val), '預估餘額']}
+                />
+                {forecasts.map((f) => (
+                  <ReferenceLine
+                    key={f.id}
+                    y={f.cumulativeGoal}
+                    stroke="#a78bfa"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: `${f.name}${
+                        f.monthsToGoal === 0
+                          ? ' · 已達成'
+                          : f.monthsToGoal !== null
+                          ? ` · ${f.monthsToGoal}m`
+                          : ''
+                      }`,
+                      position: 'right',
+                      fill: '#a78bfa',
+                      fontSize: 10,
+                    }}
+                  />
+                ))}
+                <Line
+                  type="monotone"
+                  dataKey="balance"
+                  name="預估餘額"
+                  stroke="#818cf8"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{r: 5, fill: '#818cf8'}}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       <div className="col-span-12 bg-[#18181b] p-6 rounded-xl shadow-xl border border-[#27272a]">
@@ -233,6 +406,9 @@ export function AllocationsView({
                   ? Math.min(1, Math.max(0, a.resolvedAmount / baseBalance))
                   : 0;
               const isPercent = a.targetMode === 'percent';
+              const forecast = forecastById.get(a.id);
+              const hasGoal =
+                typeof a.goalAmount === 'number' && a.goalAmount > 0;
               return (
                 <li
                   key={a.id}
@@ -306,6 +482,27 @@ export function AllocationsView({
                       </span>
                     )}
 
+                    <div className="flex items-center gap-1 text-xs text-zinc-500">
+                      <Target size={12} className="text-zinc-600" />
+                      <span className="font-mono text-[10px] uppercase tracking-wider">
+                        Goal
+                      </span>
+                      <input
+                        type="number"
+                        defaultValue={a.goalAmount ?? ''}
+                        key={`${a.id}-goal-${a.goalAmount ?? ''}`}
+                        placeholder="—"
+                        onBlur={(e) => handleChangeGoal(a, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter')
+                            (e.target as HTMLInputElement).blur();
+                        }}
+                        className="w-24 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    {forecast && <ForecastBadge months={forecast.monthsToGoal} />}
+
                     <div className="ml-auto flex items-center gap-1">
                       <button
                         onClick={() => archiveAllocation(a.id, true)}
@@ -325,17 +522,41 @@ export function AllocationsView({
                     </div>
                   </div>
 
-                  {baseBalance > 0 && (
-                    <div className="mt-2 h-1.5 w-full bg-zinc-800 rounded overflow-hidden">
-                      <div
-                        className={`h-full ${
-                          a.resolvedAmount > baseBalance
-                            ? 'bg-red-500'
-                            : 'bg-indigo-500'
-                        }`}
-                        style={{width: `${ratio * 100}%`}}
-                      />
+                  {hasGoal && forecast ? (
+                    <div className="mt-2">
+                      <div className="h-1.5 w-full bg-zinc-800 rounded overflow-hidden">
+                        <div
+                          className={`h-full ${
+                            forecast.progressRatio >= 1
+                              ? 'bg-emerald-500'
+                              : 'bg-indigo-500'
+                          }`}
+                          style={{width: `${forecast.progressRatio * 100}%`}}
+                        />
+                      </div>
+                      <div className="mt-1 flex justify-between text-[10px] font-mono text-zinc-600">
+                        <span>
+                          {formatCurrency(forecast.currentAmount)} /{' '}
+                          {formatCurrency(forecast.goalAmount)}
+                        </span>
+                        <span>
+                          {Math.round(forecast.progressRatio * 100)}%
+                        </span>
+                      </div>
                     </div>
+                  ) : (
+                    baseBalance > 0 && (
+                      <div className="mt-2 h-1.5 w-full bg-zinc-800 rounded overflow-hidden">
+                        <div
+                          className={`h-full ${
+                            a.resolvedAmount > baseBalance
+                              ? 'bg-red-500'
+                              : 'bg-indigo-500'
+                          }`}
+                          style={{width: `${ratio * 100}%`}}
+                        />
+                      </div>
+                    )
                   )}
                 </li>
               );
@@ -435,5 +656,27 @@ function SummaryCell({label, value, tone}: SummaryCellProps) {
       </div>
       <div className="mt-1 text-lg font-semibold font-mono">{value}</div>
     </div>
+  );
+}
+
+function ForecastBadge({months}: {months: number | null}) {
+  if (months === 0) {
+    return (
+      <span className="text-[10px] font-mono px-2 py-0.5 rounded border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+        已達成
+      </span>
+    );
+  }
+  if (months === null) {
+    return (
+      <span className="text-[10px] font-mono px-2 py-0.5 rounded border bg-zinc-800 text-zinc-500 border-zinc-700">
+        --
+      </span>
+    );
+  }
+  return (
+    <span className="text-[10px] font-mono px-2 py-0.5 rounded border bg-indigo-500/10 text-indigo-400 border-indigo-500/20">
+      預計 {months} 個月
+    </span>
   );
 }

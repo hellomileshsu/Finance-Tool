@@ -40,6 +40,7 @@ export default function App() {
     updateRecordValue,
     addNextMonth,
     updateBaseBalance,
+    updateSavingsRate,
     deleteCategory,
     renameCategory,
     removeLastMonth,
@@ -199,11 +200,13 @@ export default function App() {
             <AllocationsView
               allocations={allocations}
               computedData={computedData}
+              settings={settings}
               addAllocation={addAllocation}
               updateAllocation={updateAllocation}
               deleteAllocation={deleteAllocation}
               archiveAllocation={archiveAllocation}
               reorderAllocations={reorderAllocations}
+              updateSavingsRate={updateSavingsRate}
             />
           )}
 

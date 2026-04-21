@@ -30,6 +30,7 @@ export type FinanceRecord = {
 
 export type Settings = {
   baseInitialBalance: number;
+  monthlySavingsRate?: number;
 };
 
 export type ComputedRow = FinanceRecord & {
@@ -50,4 +51,5 @@ export type Allocation = {
   order: number;
   archived: boolean;
   archivedAt?: number;
+  goalAmount?: number;
 };
