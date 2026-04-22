@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -28,15 +29,17 @@ import type {
   Allocation,
   AllocationTargetMode,
   ComputedRow,
-  Settings,
 } from '../types';
 import {formatCurrency} from '../utils/format';
-import {buildProjectionSeries, computeForecasts} from '../utils/projection';
+import {
+  buildTimelinePoints,
+  computeForecasts,
+  deriveSavingsRate,
+} from '../utils/projection';
 
 type Props = {
   allocations: Allocation[];
   computedData: ComputedRow[];
-  settings: Settings;
   addAllocation: (
     name: string,
     targetMode: AllocationTargetMode,
@@ -49,21 +52,19 @@ type Props = {
   deleteAllocation: (id: string, name: string) => Promise<void>;
   archiveAllocation: (id: string, archive: boolean) => Promise<void>;
   reorderAllocations: (fromIdx: number, toIdx: number) => Promise<void>;
-  updateSavingsRate: (val: number) => Promise<void>;
 };
+
+const SAVINGS_WINDOW = 6;
 
 export function AllocationsView({
   allocations,
   computedData,
-  settings,
   addAllocation,
   updateAllocation,
   deleteAllocation,
   archiveAllocation,
   reorderAllocations,
-  updateSavingsRate,
 }: Props) {
-  const savingsRate = settings.monthlySavingsRate ?? 0;
   const monthOptions = useMemo(
     () =>
       [...computedData]
@@ -89,6 +90,14 @@ export function AllocationsView({
     [computedData, selectedMonth],
   );
   const baseBalance = baseRow?.finalBalance ?? 0;
+
+  const latestRow = computedData[computedData.length - 1];
+  const latestBalance = latestRow?.finalBalance ?? baseBalance;
+
+  const {rate: savingsRate, sampleSize} = useMemo(
+    () => deriveSavingsRate(computedData, SAVINGS_WINDOW),
+    [computedData],
+  );
 
   const activeAllocations = useMemo(
     () => allocations.filter((a) => !a.archived),
@@ -121,29 +130,32 @@ export function AllocationsView({
   const freeBalance = baseBalance - totalAllocated;
 
   const forecasts = useMemo(
-    () => computeForecasts(activeAllocations, baseBalance, savingsRate),
-    [activeAllocations, baseBalance, savingsRate],
+    () => computeForecasts(activeAllocations, latestBalance, savingsRate),
+    [activeAllocations, latestBalance, savingsRate],
   );
   const forecastById = useMemo(() => {
     const map = new Map<string, (typeof forecasts)[number]>();
     forecasts.forEach((f) => map.set(f.id, f));
     return map;
   }, [forecasts]);
-  const projectionSeries = useMemo(
-    () => buildProjectionSeries(baseBalance, savingsRate, 24),
-    [baseBalance, savingsRate],
-  );
-  const maxGoal = forecasts.length
-    ? forecasts[forecasts.length - 1].cumulativeGoal
-    : 0;
-  const projectionYMax = Math.max(
-    projectionSeries[projectionSeries.length - 1]?.balance ?? baseBalance,
-    maxGoal,
-    baseBalance,
+  const timeline = useMemo(
+    () => buildTimelinePoints(computedData, savingsRate, 24),
+    [computedData, savingsRate],
   );
 
+  const chartYMax = useMemo(() => {
+    const values: number[] = [];
+    timeline.forEach((p) => {
+      if (typeof p.actualBalance === 'number') values.push(p.actualBalance);
+      if (typeof p.projectedBalance === 'number')
+        values.push(p.projectedBalance);
+    });
+    forecasts.forEach((f) => values.push(f.cumulativeGoal));
+    return values.length ? Math.max(...values) : latestBalance;
+  }, [timeline, forecasts, latestBalance]);
+
   const handleAdd = async () => {
-    const name = window.prompt('請輸入存款分類名稱（例如：緊急備用金）：');
+    const name = window.prompt('請輸入存款分類名稱（例如:緊急備用金）:');
     if (name === null) return;
     const trimmed = name.trim();
     if (trimmed === '') {
@@ -155,7 +167,7 @@ export function AllocationsView({
     );
     const mode: AllocationTargetMode = isFixed ? 'fixed' : 'percent';
     const label = isFixed ? '目標金額' : '目標百分比 (0~100)';
-    const raw = window.prompt(`請輸入${label}：`);
+    const raw = window.prompt(`請輸入${label}:`);
     if (raw === null) return;
     const num = parseFloat(raw);
     if (!isFinite(num) || num < 0) {
@@ -170,7 +182,7 @@ export function AllocationsView({
   };
 
   const handleRename = async (a: Allocation) => {
-    const next = window.prompt('請輸入新的分類名稱：', a.name);
+    const next = window.prompt('請輸入新的分類名稱:', a.name);
     if (next === null) return;
     const trimmed = next.trim();
     if (trimmed === '' || trimmed === a.name) return;
@@ -199,14 +211,6 @@ export function AllocationsView({
     await updateAllocation(a.id, {goalAmount: num});
   };
 
-  const handleChangeSavingsRate = async (raw: string) => {
-    const trimmed = raw.trim();
-    const num = trimmed === '' ? 0 : parseFloat(trimmed);
-    if (!isFinite(num) || num < 0) return;
-    if (num === savingsRate) return;
-    await updateSavingsRate(num);
-  };
-
   if (computedData.length === 0) {
     return (
       <div className="bg-[#18181b] rounded-xl shadow-xl border border-[#27272a] p-12 text-center">
@@ -229,7 +233,7 @@ export function AllocationsView({
               <span className="truncate">存款分類規劃</span>
             </h3>
             <p className="text-xs sm:text-sm text-zinc-500 truncate">
-              Snapshot basis · 以選定月份期末餘額為基準
+              Snapshot · 不影響預測圖錨點（錨點為最新月份）
             </p>
           </div>
           <select
@@ -263,47 +267,47 @@ export function AllocationsView({
           />
         </div>
 
-        <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 pt-4 border-t border-[#27272a]">
-          <label className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 shrink-0">
-            每月存款速率
-          </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            defaultValue={savingsRate || ''}
-            key={`savings-rate-${savingsRate}`}
-            placeholder="0"
-            onBlur={(e) => handleChangeSavingsRate(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter')
-                (e.target as HTMLInputElement).blur();
-            }}
-            className="w-full sm:w-32 bg-[#09090b] border border-[#27272a] text-zinc-100 rounded px-2 py-1.5 sm:py-1 text-sm text-right font-mono focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none"
-          />
-          <span className="text-[10px] font-mono text-zinc-600">
-            用於推算各目標達成月份；空白視為 0
+        <div className="mt-4 pt-4 border-t border-[#27272a] flex items-center justify-between flex-wrap gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            {sampleSize === 0
+              ? '月存款速率'
+              : `月存款速率（近 ${sampleSize} 個月 netValue 平均）`}
+          </span>
+          <span
+            className={`font-mono text-sm ${
+              sampleSize === 0
+                ? 'text-zinc-500'
+                : savingsRate >= 0
+                ? 'text-emerald-400'
+                : 'text-red-400'
+            }`}
+          >
+            {sampleSize === 0
+              ? '尚無資料'
+              : `${formatCurrency(savingsRate)} / 月`}
           </span>
         </div>
       </div>
 
       <div className="col-span-12 bg-[#18181b] p-4 sm:p-6 rounded-xl shadow-xl border border-[#27272a]">
-        <div className="flex justify-between items-start mb-4">
+        <div className="flex justify-between items-start mb-4 gap-3">
           <div className="min-w-0">
             <h4 className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
               <TrendingUp size={16} className="text-indigo-400 shrink-0" />
               達成預測
             </h4>
             <p className="text-[11px] text-zinc-500 mt-0.5 truncate">
-              依 allocation 順序累積；未來 24 個月線性外推
+              歷史實際餘額 + 未來 24 個月預測（依 allocation 順序累積目標）
             </p>
           </div>
+          {savingsRate < 0 && forecasts.length > 0 && (
+            <span className="text-[10px] font-mono px-2 py-1 rounded border bg-red-500/10 text-red-400 border-red-500/20 shrink-0">
+              近期淨支出，預測下行
+            </span>
+          )}
         </div>
 
-        {savingsRate <= 0 ? (
-          <div className="text-center py-10 text-zinc-600 font-mono text-xs">
-            [ 請先輸入每月存款速率 ]
-          </div>
-        ) : forecasts.length === 0 ? (
+        {forecasts.length === 0 ? (
           <div className="text-center py-10 text-zinc-600 font-mono text-xs">
             [ 尚無設定目標（goal）的分類 ]
           </div>
@@ -311,7 +315,7 @@ export function AllocationsView({
           <div className="h-64 sm:h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={projectionSeries}
+                data={timeline}
                 margin={{top: 8, right: 12, bottom: 5, left: 4}}
               >
                 <CartesianGrid
@@ -326,18 +330,22 @@ export function AllocationsView({
                   tickMargin={8}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(m: number) => `+${m}m`}
                   interval="preserveStartEnd"
-                  minTickGap={24}
+                  minTickGap={32}
                 />
                 <YAxis
                   stroke="#71717a"
                   fontSize={10}
                   width={48}
-                  tickFormatter={(val: number) => `¥${Math.round(val / 1000)}k`}
+                  tickFormatter={(val: number) =>
+                    `¥${Math.round(val / 1000)}k`
+                  }
                   tickLine={false}
                   axisLine={false}
-                  domain={[0, Math.ceil(projectionYMax * 1.1)]}
+                  domain={[
+                    (dataMin: number) => Math.min(0, Math.floor(dataMin)),
+                    Math.ceil(chartYMax * 1.1),
+                  ]}
                 />
                 <Tooltip
                   contentStyle={{
@@ -346,8 +354,15 @@ export function AllocationsView({
                     borderRadius: 6,
                     fontSize: 12,
                   }}
-                  labelFormatter={(m) => `第 ${m} 個月`}
-                  formatter={(val: number) => [formatCurrency(val), '預估餘額']}
+                  labelFormatter={(m) => m}
+                  formatter={(val: number, name: string) => [
+                    formatCurrency(val),
+                    name,
+                  ]}
+                />
+                <Legend
+                  wrapperStyle={{fontSize: 11, color: '#a1a1aa'}}
+                  iconType="plainline"
                 />
                 {forecasts.map((f) => {
                   const shortName =
@@ -356,7 +371,7 @@ export function AllocationsView({
                     f.monthsToGoal === 0
                       ? ' · 已達成'
                       : f.monthsToGoal !== null
-                      ? ` · ${f.monthsToGoal}m`
+                      ? ` · 剩 ${f.monthsToGoal}m`
                       : '';
                   return (
                     <ReferenceLine
@@ -375,12 +390,26 @@ export function AllocationsView({
                 })}
                 <Line
                   type="monotone"
-                  dataKey="balance"
-                  name="預估餘額"
+                  dataKey="actualBalance"
+                  name="實際餘額"
+                  stroke="#a78bfa"
+                  strokeWidth={2.5}
+                  dot={{r: 3, fill: '#a78bfa', strokeWidth: 0}}
+                  activeDot={{r: 5, fill: '#a78bfa'}}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="projectedBalance"
+                  name="預測餘額"
                   stroke="#818cf8"
                   strokeWidth={2}
+                  strokeDasharray="5 5"
                   dot={false}
-                  activeDot={{r: 5, fill: '#818cf8'}}
+                  activeDot={{r: 4, fill: '#818cf8'}}
+                  connectNulls={false}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>

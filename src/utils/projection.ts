@@ -1,4 +1,5 @@
-import type {Allocation} from '../types';
+import type {Allocation, ComputedRow} from '../types';
+import {getNextMonthStr} from './format';
 
 export type AllocationForecast = {
   id: string;
@@ -52,16 +53,50 @@ export function computeForecasts(
   });
 }
 
-export type ProjectionPoint = {month: number; balance: number};
+export function deriveSavingsRate(
+  computedData: ComputedRow[],
+  windowMonths = 6,
+): {rate: number; sampleSize: number} {
+  if (computedData.length === 0) return {rate: 0, sampleSize: 0};
+  const sorted = [...computedData].sort((a, b) =>
+    a.month.localeCompare(b.month),
+  );
+  const window = sorted.slice(-windowMonths);
+  const sum = window.reduce((s, r) => s + r.netValue, 0);
+  return {rate: sum / window.length, sampleSize: window.length};
+}
 
-export function buildProjectionSeries(
-  baseBalance: number,
+export type TimelinePoint = {
+  month: string;
+  actualBalance?: number;
+  projectedBalance?: number;
+};
+
+export function buildTimelinePoints(
+  computedData: ComputedRow[],
   savingsRate: number,
-  months = 24,
-): ProjectionPoint[] {
-  const series: ProjectionPoint[] = [];
-  for (let m = 0; m <= months; m++) {
-    series.push({month: m, balance: baseBalance + savingsRate * m});
+  futureMonths = 24,
+): TimelinePoint[] {
+  if (computedData.length === 0) return [];
+  const sorted = [...computedData].sort((a, b) =>
+    a.month.localeCompare(b.month),
+  );
+
+  const points: TimelinePoint[] = sorted.map((r) => ({
+    month: r.month,
+    actualBalance: r.finalBalance,
+  }));
+
+  const anchor = sorted[sorted.length - 1];
+  points[points.length - 1].projectedBalance = anchor.finalBalance;
+
+  let cursor = anchor.month;
+  for (let m = 1; m <= futureMonths; m++) {
+    cursor = getNextMonthStr(cursor);
+    points.push({
+      month: cursor,
+      projectedBalance: anchor.finalBalance + savingsRate * m,
+    });
   }
-  return series;
+  return points;
 }
